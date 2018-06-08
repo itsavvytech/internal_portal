@@ -49,7 +49,16 @@ def file_process(path, file_name):
             if date not in records_dict[person_name]:
                 records_dict[person_name][date] = [time]
             else:
-                records_dict[person_name][date].append(time)
+                if len(records_dict[person_name][date]) < 5:
+                    records_dict[person_name][date].append(time)
+                else:
+                    records_dict[person_name][date][-1] += ', ' + time
+
+    for name, records in records_dict.items():
+        for date, time_list in records.items():
+            length = len(time_list)
+            for i in range(0, 5-length):
+                time_list.append(None)
 
     with open(os.path.join(path, current_app.config.get('ATTENDANCE_NAME')), 'w') as fp:
         json.dump(records_dict, fp)
