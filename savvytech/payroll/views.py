@@ -23,7 +23,7 @@ def index():
         file.save(os.path.join(file_path, file_name))
         file_process(file_path, file_name)
         return send_from_directory(directory=current_app.config.get('UPLOAD_FOLDER'),
-                                   filename=current_app.config.get('ATTENDANCE_NAME') + '.xlsx', as_attachment=True)
+                                   filename=current_app.config.get('ATTENDANCE_NAME') + '.xls', as_attachment=True)
         #return redirect(url_for('payroll.attendance'))
     return render_template('payroll/index.html', form=form)
 
