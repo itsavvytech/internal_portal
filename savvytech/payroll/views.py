@@ -75,7 +75,7 @@ def file_process(path, file_name):
             for i, time in enumerate(time_list):
                 row.write(i+1, time)
             index += 1
-    book.save(os.path.join(path, current_app.config.get('ATTENDANCE_NAME')+'.xlsx'))
+    book.save(os.path.join(path, current_app.config.get('ATTENDANCE_NAME')+'.xls'))
 
     with open(os.path.join(path, current_app.config.get('ATTENDANCE_NAME')+'.json'), 'w') as fp:
         json.dump(records_dict, fp)
