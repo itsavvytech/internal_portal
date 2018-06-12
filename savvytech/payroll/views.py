@@ -25,7 +25,7 @@ def index():
         return redirect(url_for('payroll.attendance'))
     return render_template('payroll/index.html', form=form)
 
-@payroll.route('/attendance')
+@payroll.route('/attendance', methods=['GET', 'POST'])
 def attendance():
     with open(os.path.join(current_app.config.get('UPLOAD_FOLDER'), current_app.config.get('ATTENDANCE_NAME'))) as fp:
         data_set = json.load(fp)
