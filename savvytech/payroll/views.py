@@ -5,7 +5,7 @@ from flask_wtf.file import FileAllowed, FileRequired
 from wtforms import FileField, SubmitField
 from werkzeug.utils import secure_filename
 from . import payroll
-import os, xlrd, json
+import os, xlrd, xlwt, json
 from collections import OrderedDict
 
 class UploadForm(FlaskForm):
@@ -25,7 +25,7 @@ def index():
         return redirect(url_for('payroll.attendance'))
     return render_template('payroll/index.html', form=form)
 
-@payroll.route('/attendance', methods=['GET', 'POST'])
+@payroll.route('/attendance')
 def attendance():
     with open(os.path.join(current_app.config.get('UPLOAD_FOLDER'), current_app.config.get('ATTENDANCE_NAME'))) as fp:
         data_set = json.load(fp)
@@ -39,9 +39,12 @@ def file_process(path, file_name):
     records_dict = {}
     for row_num in range(1, sh.nrows):
         row = sh.row(row_num)
+        person_id = int(row[2].value)
         person_name = row[3].value
+        person_name = ':'.join([person_name, str(person_id)])
         date = row[5].value
         date, time = str(xlrd.xldate.xldate_as_datetime(date, book.datemode)).split()
+        time = time[:-3] # sort out seconds
         if person_name not in records_dict:
             records_dict[person_name] = OrderedDict()
             records_dict[person_name][date] = [time]
@@ -49,16 +52,16 @@ def file_process(path, file_name):
             if date not in records_dict[person_name]:
                 records_dict[person_name][date] = [time]
             else:
-                if len(records_dict[person_name][date]) < 5:
+                if len(records_dict[person_name][date]) < 4:
                     records_dict[person_name][date].append(time)
-                else:
-                    records_dict[person_name][date][-1] += ', ' + time
+                # else:
+                #     records_dict[person_name][date][-1] += ', ' + time
 
-    for name, records in records_dict.items():
-        for date, time_list in records.items():
-            length = len(time_list)
-            for i in range(0, 5-length):
-                time_list.append(None)
+    # for name, records in records_dict.items():
+    #     for date, time_list in records.items():
+    #         length = len(time_list)
+    #         for i in range(0, 5-length):
+    #             time_list.append(None)
 
     with open(os.path.join(path, current_app.config.get('ATTENDANCE_NAME')), 'w') as fp:
         json.dump(records_dict, fp)
