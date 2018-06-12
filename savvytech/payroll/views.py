@@ -57,11 +57,11 @@ def file_process(path, file_name):
                 # else:
                 #     records_dict[person_name][date][-1] += ', ' + time
 
-    # for name, records in records_dict.items():
-    #     for date, time_list in records.items():
-    #         length = len(time_list)
-    #         for i in range(0, 5-length):
-    #             time_list.append(None)
+    for name, records in records_dict.items():
+        for date, time_list in records.items():
+            length = len(time_list)
+            for i in range(0, 4-length):
+                time_list.append(None)
 
     with open(os.path.join(path, current_app.config.get('ATTENDANCE_NAME')), 'w') as fp:
         json.dump(records_dict, fp)
