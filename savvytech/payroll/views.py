@@ -25,7 +25,7 @@ def index():
         return redirect(url_for('payroll.attendance'))
     return render_template('payroll/index.html', form=form)
 
-@payroll.route('/attendance', methods=['GET', 'POST'])
+@payroll.route('/attendance')
 def attendance():
     with open(os.path.join(current_app.config.get('UPLOAD_FOLDER'), current_app.config.get('ATTENDANCE_NAME'))) as fp:
         data_set = json.load(fp)
@@ -41,7 +41,7 @@ def file_process(path, file_name):
         row = sh.row(row_num)
         person_id = int(row[2].value)
         person_name = row[3].value
-        person_name = ':'.join([person_name, str(person_id)])
+        person_name = '-'.join([person_name, str(person_id)])
         date = row[5].value
         date, time = str(xlrd.xldate.xldate_as_datetime(date, book.datemode)).split()
         time = time[:-3] # sort out seconds
