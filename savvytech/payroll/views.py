@@ -1,5 +1,5 @@
 from datetime import datetime
-from flask import render_template, redirect, url_for, request, current_app
+from flask import render_template, redirect, url_for, request, current_app, send_from_directory
 from flask_wtf import FlaskForm
 from flask_wtf.file import FileAllowed, FileRequired
 from wtforms import FileField, SubmitField
@@ -12,7 +12,7 @@ class UploadForm(FlaskForm):
     file = FileField('', validators=[FileAllowed(['xlsx', 'xls'], 'Expecting Microsoft Excel files'), FileRequired()])
     submit = SubmitField('Upload')
 
-@payroll.route('/', methods=['GET', 'POST'])
+@payroll.route('/timecard', methods=['GET', 'POST'])
 def index():
     form = UploadForm()
     form.file.description = 'Step1: Please upload the attendance file here.'
@@ -22,12 +22,14 @@ def index():
         file_path = current_app.config.get('UPLOAD_FOLDER')
         file.save(os.path.join(file_path, file_name))
         file_process(file_path, file_name)
-        return redirect(url_for('payroll.attendance'))
+        return send_from_directory(directory=current_app.config.get('UPLOAD_FOLDER'),
+                                   filename=current_app.config.get('ATTENDANCE_NAME') + '.xlsx', as_attachment=True)
+        #return redirect(url_for('payroll.attendance'))
     return render_template('payroll/index.html', form=form)
 
 @payroll.route('/attendance')
 def attendance():
-    with open(os.path.join(current_app.config.get('UPLOAD_FOLDER'), current_app.config.get('ATTENDANCE_NAME'))) as fp:
+    with open(os.path.join(current_app.config.get('UPLOAD_FOLDER'), current_app.config.get('ATTENDANCE_NAME')+'.json')) as fp:
         data_set = json.load(fp)
         return render_template('payroll/form.html', data_set=data_set)
 
@@ -63,7 +65,19 @@ def file_process(path, file_name):
             for i in range(0, 4-length):
                 time_list.append(None)
 
-    with open(os.path.join(path, current_app.config.get('ATTENDANCE_NAME')), 'w') as fp:
+    book = xlwt.Workbook()
+    for name, records in records_dict.items():
+        sh = book.add_sheet(name)
+        index = 0
+        for date, time_list in records.items():
+            row = sh.row(index)
+            row.write(0, date)
+            for i, time in enumerate(time_list):
+                row.write(i+1, time)
+            index += 1
+    book.save(os.path.join(path, current_app.config.get('ATTENDANCE_NAME')+'.xlsx'))
+
+    with open(os.path.join(path, current_app.config.get('ATTENDANCE_NAME')+'.json'), 'w') as fp:
         json.dump(records_dict, fp)
 
     os.remove(os.path.join(path, file_name))
