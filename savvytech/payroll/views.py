@@ -1,4 +1,3 @@
-from datetime import datetime
 from flask import render_template, redirect, url_for, request, current_app, send_from_directory, flash
 from flask_wtf import FlaskForm
 from flask_wtf.file import FileAllowed, FileRequired
@@ -52,7 +51,8 @@ def commission_2():
         file_path = current_app.config.get('UPLOAD_FOLDER')
         file.save(os.path.join(file_path, file_name))
         commission_preprocess(file_path, file_name)
-        return redirect(url_for('payroll.results_1'))
+        return send_from_directory(directory=current_app.config.get('UPLOAD_FOLDER'),
+                                   filename=current_app.config.get('COMMISSION_NAME') + '.xls', as_attachment=True)
     flash('Please upload your raw commission file! Then complete the downloaded commission file and upload it in the results tab!')
     return render_template('payroll/index.html', form=form)
 
@@ -91,7 +91,7 @@ def timecard_preprocess(path, file_name):
         row = sh.row(row_num)
         person_id = int(row[2].value)
         person_name = row[3].value
-        person_name = '-'.join([person_name, str(person_id)])
+        person_name = '-'.join([person_name.upper(), str(person_id)])
         date = row[5].value
         date, time = str(xlrd.xldate.xldate_as_datetime(date, book.datemode)).split()
         time = time[:-3] # sort out seconds
@@ -164,6 +164,19 @@ def timecard_postprocess(path, file_name):
 
     os.remove(os.path.join(path, file_name))
 
+def compute_bonus_commission(sales, bucket_list):
+    bonus, commission = 0, 0
+    for index, bucket in enumerate(bucket_list):
+        if sales > bucket[0]:
+            commission += (bucket[0] - bucket_list[index-1][0]) * bucket[1] if index > 0 else bucket[0] * bucket[1]
+            bonus = bucket[2]
+        else:
+            commission += (sales - bucket_list[index-1][0]) * bucket[1] if index > 0 else sales * bucket[1]
+            break
+    if sales > bucket_list[-1][0]:
+        commission += (sales - bucket_list[-1][0]) * bucket_list[-1][1]
+    return round(bonus, 2), round(commission, 2)
+
 def commission_preprocess(path, file_name):
     book = xlrd.open_workbook(os.path.join(path, file_name))
     sh = book.sheet_by_index(0)
@@ -172,8 +185,29 @@ def commission_preprocess(path, file_name):
     for row_num in range(1, sh.nrows):
         row = sh.row(row_num)
         person_id = int(row[0].value)
-        person_name = '-'.join([row[1].value, str(person_id)])
+        person_name = '-'.join([row[1].value.upper(), str(person_id)])
         final_sale = float(row[2].value)
+
+        bonus, commission = compute_bonus_commission(final_sale, current_app.config.get('SALES_PARAMS')[person_name])
+        records_dict[person_name] = [bonus, commission, 0, 0, bonus + commission, round(bonus/2, 2), round(commission/2, 2), round(bonus/2 + commission/2, 2)]
+
+    book = xlwt.Workbook()
+    for name, records in records_dict.items():
+        sh = book.add_sheet(name)
+        row = sh.row(0)
+        row.write(0, 'Bonus')
+        row.write(1, 'Commission')
+        row.write(2, 'KPI Bonus')
+        row.write(3, 'Extra Bonus')
+        row.write(4, 'Total')
+        row.write(5, '1/2 Bonus')
+        row.write(6, '1/2 Commission')
+        row.write(7, 'Period Paid')
+
+        row = sh.row(1)
+        for i, record in enumerate(records):
+            row.write(i, record)
+    book.save(os.path.join(path, current_app.config.get('COMMISSION_NAME')+'.xls'))
 
 def commission_postprocess(path, file_name):
     pass
