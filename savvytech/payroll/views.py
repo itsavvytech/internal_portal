@@ -110,7 +110,17 @@ def timecard_preprocess(path, file_name):
     book = xlwt.Workbook()
     for name, records in records_dict.items():
         sh = book.add_sheet(name)
-        index = 0
+        row = sh.row(0)
+        row.write(0, 'Date')
+        row.write(1, 'Checkin')
+        row.write(2, 'Checkout')
+        row.write(3, 'Checkin')
+        row.write(4, 'Checkout')
+        row.write(5, 'Working Hours')
+        row.write(6, 'Overtime Hours')
+        row.write(7, 'Regular Hours')
+
+        index = 1
         total_hours = []
         overtime_hours = []
         reg_hours = []
@@ -129,10 +139,16 @@ def timecard_preprocess(path, file_name):
                 reg_hours.append(8 if total_hour > 8 else total_hour)
                 row.write(i+4, reg_hours[-1])
         row = sh.row(index)
+        row.write(4, 'Total')
         row.write(5, sum(total_hours))
         row.write(6, sum(overtime_hours))
         row.write(7, sum(reg_hours))
-        row = sh.row(index+1)
+
+        row = sh.row(index + 1)
+        row.write(0, 'Sick Hours')  # sick hour
+        row.write(1, 'Vacation Hours')  # vacation hour
+        row.write(2, 'Holiday Hours')  # holiday hour
+        row = sh.row(index + 2)
         row.write(0, 0) # sick hour
         row.write(1, 0) # vacation hour
         row.write(2, 0) # holiday hour
@@ -151,7 +167,7 @@ def timecard_postprocess(path, file_name):
         reg_hour = 0
 
         row_num = sheet.nrows
-        for i in range(0, row_num - 2):
+        for i in range(1, row_num - 3):
             current_hour = compute_time([sheet.cell(i, 1).value, sheet.cell(i, 2).value, sheet.cell(i, 3).value, sheet.cell(i, 4).value])
             total_hour += current_hour
             overtime_hour += 0 if current_hour <= 8 else current_hour-8
