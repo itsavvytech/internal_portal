@@ -29,14 +29,13 @@ def index():
 @payroll.route('/commission', methods=['GET', 'POST'])
 def commission_1():
     form = UploadForm()
-    form.file.description = 'Step 2 a): Please upload modified timecard here.'
+    form.file.description = 'Step 2 a): Please upload completed timecard here.'
     if form.validate_on_submit():
         file = request.files['file']
         file_name = secure_filename(file.filename)
         file_path = current_app.config.get('UPLOAD_FOLDER')
         file.save(os.path.join(file_path, file_name))
         timecard_postprocess(file_path, file_name)
-        flash('Timecard was successfully uploaded!')
         return redirect(url_for('payroll.commission_2'))
     flash('Please upload your completed timecard file!')
     return render_template('payroll/index.html', form=form)
@@ -59,7 +58,7 @@ def commission_2():
 @payroll.route('/results', methods=['GET', 'POST'])
 def results_1():
     form = UploadForm()
-    form.file.description = 'Step 3): Please upload modified commission file here.'
+    form.file.description = 'Step 3): Please upload completed commission file here.'
     if form.validate_on_submit():
         file = request.files['file']
         file_name = secure_filename(file.filename)
@@ -72,8 +71,11 @@ def results_1():
 
 @payroll.route('/results#')
 def results_2():
-    from datetime import datetime
-    return render_template('index.html', current_time=datetime.utcnow())
+    with open(os.path.join(current_app.config.get('UPLOAD_FOLDER'), current_app.config.get('TIMECARD_NAME') + '.json')) as fp:
+        timecard_set = json.load(fp)
+        with open(os.path.join(current_app.config.get('UPLOAD_FOLDER'), current_app.config.get('COMMISSION_NAME') + '.json')) as fp:
+            commission_set = json.load(fp)
+            return render_template('payroll/results.html', timecard_set=timecard_set, commission_set=commission_set)
 
 def compute_time(time_list):
     if len(time_list) < 4:
@@ -110,7 +112,7 @@ def timecard_preprocess(path, file_name):
         sh = book.add_sheet(name)
         index = 0
         total_hours = []
-        extra_hours = []
+        overtime_hours = []
         reg_hours = []
         for date, time_list in records.items():
             row = sh.row(index)
@@ -122,13 +124,13 @@ def timecard_preprocess(path, file_name):
             if total_hour:
                 total_hours.append(total_hour)
                 row.write(i+2, total_hours[-1])
-                extra_hours.append(0 if total_hour <= 8 else total_hour-8)
-                row.write(i+3, extra_hours[-1])
+                overtime_hours.append(0 if total_hour <= 8 else total_hour-8)
+                row.write(i+3, overtime_hours[-1])
                 reg_hours.append(8 if total_hour > 8 else total_hour)
                 row.write(i+4, reg_hours[-1])
         row = sh.row(index)
         row.write(5, sum(total_hours))
-        row.write(6, sum(extra_hours))
+        row.write(6, sum(overtime_hours))
         row.write(7, sum(reg_hours))
         row = sh.row(index+1)
         row.write(0, 0) # sick hour
@@ -145,19 +147,19 @@ def timecard_postprocess(path, file_name):
     for sheet in book.sheets():
         person_name = sheet.name
         total_hour = 0
-        extra_hour = 0
+        overtime_hour = 0
         reg_hour = 0
 
         row_num = sheet.nrows
         for i in range(0, row_num - 2):
             current_hour = compute_time([sheet.cell(i, 1).value, sheet.cell(i, 2).value, sheet.cell(i, 3).value, sheet.cell(i, 4).value])
             total_hour += current_hour
-            extra_hour += 0 if current_hour <= 8 else current_hour-8
+            overtime_hour += 0 if current_hour <= 8 else current_hour-8
             reg_hour += 8 if current_hour > 8 else current_hour
         additional_hour = float(sheet.cell(row_num-1, 0).value) + float(sheet.cell(row_num-1, 1).value) + float(sheet.cell(row_num-1, 2).value)
         total_hour += additional_hour
         reg_hour += additional_hour
-        records_dict[person_name] = [round(total_hour, 2), round(extra_hour, 2), round(reg_hour, 2)]
+        records_dict[person_name] = [round(total_hour, 2), round(overtime_hour, 2), round(reg_hour, 2), round(additional_hour, 2)]
 
     with open(os.path.join(path, current_app.config.get('TIMECARD_NAME') + '.json'), 'w') as fp:
         json.dump(records_dict, fp)
@@ -210,4 +212,19 @@ def commission_preprocess(path, file_name):
     book.save(os.path.join(path, current_app.config.get('COMMISSION_NAME')+'.xls'))
 
 def commission_postprocess(path, file_name):
-    pass
+    book = xlrd.open_workbook(os.path.join(path, file_name))
+
+    records_dict = {}
+    for sh in book.sheets():
+        person_name = sh.name
+
+        bonus = float(sh.cell(1, 0).value)
+        commission = float(sh.cell(1, 1).value)
+        kpi = float(sh.cell(1, 2).value)
+        extra = float(sh.cell(1, 3).value)
+        records_dict[person_name] = [round(commission, 2), round(bonus, 2), round(kpi, 2), round(extra, 2)]
+
+    with open(os.path.join(path, current_app.config.get('COMMISSION_NAME') + '.json'), 'w') as fp:
+        json.dump(records_dict, fp)
+
+    os.remove(os.path.join(path, file_name))
