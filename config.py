@@ -7,6 +7,7 @@ class Config:
     SAVVYTECH_ADMIN = os.environ.get('SAVVYTECH_ADMIN', 'admin')
     UPLOAD_FOLDER = '/home/vincentni/project/savvytech/savvytech/upload'
     ATTENDANCE_NAME = 'attendance'
+    COMMISSION_NAME = 'commission'
 
     @staticmethod
     def init_app(app):

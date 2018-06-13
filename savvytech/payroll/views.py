@@ -1,5 +1,5 @@
 from datetime import datetime
-from flask import render_template, redirect, url_for, request, current_app, send_from_directory
+from flask import render_template, redirect, url_for, request, current_app, send_from_directory, flash
 from flask_wtf import FlaskForm
 from flask_wtf.file import FileAllowed, FileRequired
 from wtforms import FileField, SubmitField
@@ -15,7 +15,7 @@ class UploadForm(FlaskForm):
 @payroll.route('/timecard', methods=['GET', 'POST'])
 def index():
     form = UploadForm()
-    form.file.description = 'Step1: Please upload the attendance file here.'
+    form.file.description = 'Step 1: Please upload raw time card here.'
     if form.validate_on_submit():
         file = request.files['file']
         file_name = secure_filename(file.filename)
@@ -24,15 +24,35 @@ def index():
         file_process(file_path, file_name)
         return send_from_directory(directory=current_app.config.get('UPLOAD_FOLDER'),
                                    filename=current_app.config.get('ATTENDANCE_NAME') + '.xls', as_attachment=True)
-        #return redirect(url_for('payroll.attendance'))
     return render_template('payroll/index.html', form=form)
 
-@payroll.route('/attendance')
-def attendance():
-    with open(os.path.join(current_app.config.get('UPLOAD_FOLDER'), current_app.config.get('ATTENDANCE_NAME')+'.json')) as fp:
-        data_set = json.load(fp)
-        return render_template('payroll/form.html', data_set=data_set)
+@payroll.route('/commission', methods=['GET', 'POST'])
+def commission_1():
+    form = UploadForm()
+    form.file.description = 'Step 2 a): Please upload good time card here.'
+    if form.validate_on_submit():
+        file = request.files['file']
+        file_path = current_app.config.get('UPLOAD_FOLDER')
+        file.save(os.path.join(file_path, current_app.config.get('ATTENDANCE_NAME') + '.xls'))
+        flash('Time card was successfully uploaded!')
+        return redirect(url_for('payroll.commission_2'))
+    return render_template('payroll/index.html', form=form)
 
+@payroll.route('/commission#', methods=['GET', 'POST'])
+def commission_2():
+    form = UploadForm()
+    form.file.description = 'Step 2 b): Please upload commission file here.'
+    if form.validate_on_submit():
+        file = request.files['file']
+        file_path = current_app.config.get('UPLOAD_FOLDER')
+        file.save(os.path.join(file_path, current_app.config.get('COMMISSION_NAME') + '.xls'))
+        return redirect(url_for('payroll.results'))
+    return render_template('payroll/index.html', form=form)
+
+@payroll.route('/results')
+def results():
+    from datetime import datetime
+    return render_template('index.html', current_time=datetime.utcnow())
 
 def file_process(path, file_name):
     book = xlrd.open_workbook(os.path.join(path, file_name))
