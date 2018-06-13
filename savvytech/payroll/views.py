@@ -54,6 +54,13 @@ def results():
     from datetime import datetime
     return render_template('index.html', current_time=datetime.utcnow())
 
+def compute_time(time_list):
+    if len(time_list) < 4:
+        return None
+    period_1 = 60*int(time_list[1][:2])+int(time_list[1][3:]) - 60*int(time_list[0][:2])-int(time_list[0][3:])
+    period_2 = 60*int(time_list[3][:2])+int(time_list[3][3:]) - 60*int(time_list[2][:2])-int(time_list[2][3:])
+    return round((period_1 + period_2) / 60, 2)
+
 def file_process(path, file_name):
     book = xlrd.open_workbook(os.path.join(path, file_name))
     sh = book.sheet_by_index(0)
@@ -76,25 +83,32 @@ def file_process(path, file_name):
             else:
                 if len(records_dict[person_name][date]) < 4:
                     records_dict[person_name][date].append(time)
-                # else:
-                #     records_dict[person_name][date][-1] += ', ' + time
-
-    for name, records in records_dict.items():
-        for date, time_list in records.items():
-            length = len(time_list)
-            for i in range(0, 4-length):
-                time_list.append(None)
 
     book = xlwt.Workbook()
     for name, records in records_dict.items():
         sh = book.add_sheet(name)
         index = 0
+        total_hours = []
+        extra_hours = []
+        reg_hours = []
         for date, time_list in records.items():
             row = sh.row(index)
             row.write(0, date)
             for i, time in enumerate(time_list):
                 row.write(i+1, time)
             index += 1
+            total_hour = compute_time(time_list)
+            if total_hour:
+                total_hours.append(total_hour)
+                row.write(i+2, total_hours[-1])
+                extra_hours.append(0 if total_hour <= 8 else total_hour-8)
+                row.write(i+3, extra_hours[-1])
+                reg_hours.append(8 if total_hour > 8 else total_hour)
+                row.write(i+4, reg_hours[-1])
+        row = sh.row(index)
+        row.write(5, sum(total_hours))
+        row.write(6, sum(extra_hours))
+        row.write(7, sum(reg_hours))
     book.save(os.path.join(path, current_app.config.get('ATTENDANCE_NAME')+'.xls'))
 
     with open(os.path.join(path, current_app.config.get('ATTENDANCE_NAME')+'.json'), 'w') as fp:
