@@ -6,7 +6,7 @@ class Config:
     SECRET_KEY = os.environ.get('SECRET_KEY', 'savvytech-it')
     SAVVYTECH_ADMIN = os.environ.get('SAVVYTECH_ADMIN', 'admin')
     UPLOAD_FOLDER = '/home/vincentni/project/savvytech/savvytech/upload'
-    ATTENDANCE_NAME = 'attendance'
+    TIMECARD_NAME = 'timecard'
     COMMISSION_NAME = 'commission'
 
     @staticmethod

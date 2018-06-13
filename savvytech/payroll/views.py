@@ -21,36 +21,57 @@ def index():
         file_name = secure_filename(file.filename)
         file_path = current_app.config.get('UPLOAD_FOLDER')
         file.save(os.path.join(file_path, file_name))
-        file_process(file_path, file_name)
+        timecard_preprocess(file_path, file_name)
         return send_from_directory(directory=current_app.config.get('UPLOAD_FOLDER'),
-                                   filename=current_app.config.get('ATTENDANCE_NAME') + '.xls', as_attachment=True)
+                                   filename=current_app.config.get('TIMECARD_NAME') + '.xls', as_attachment=True)
+    flash('Please upload your raw timecard file! Then complete the downloaded timecard and upload it in the commission tab!')
     return render_template('payroll/index.html', form=form)
 
 @payroll.route('/commission', methods=['GET', 'POST'])
 def commission_1():
     form = UploadForm()
-    form.file.description = 'Step 2 a): Please upload good time card here.'
+    form.file.description = 'Step 2 a): Please upload modified timecard here.'
     if form.validate_on_submit():
         file = request.files['file']
+        file_name = secure_filename(file.filename)
         file_path = current_app.config.get('UPLOAD_FOLDER')
-        file.save(os.path.join(file_path, current_app.config.get('ATTENDANCE_NAME') + '.xls'))
-        flash('Time card was successfully uploaded!')
+        file.save(os.path.join(file_path, file_name))
+        timecard_postprocess(file_path, file_name)
+        flash('Timecard was successfully uploaded!')
         return redirect(url_for('payroll.commission_2'))
+    flash('Please upload your completed timecard file!')
     return render_template('payroll/index.html', form=form)
 
 @payroll.route('/commission#', methods=['GET', 'POST'])
 def commission_2():
     form = UploadForm()
-    form.file.description = 'Step 2 b): Please upload commission file here.'
+    form.file.description = 'Step 2 b): Please upload raw commission file here.'
     if form.validate_on_submit():
         file = request.files['file']
+        file_name = secure_filename(file.filename)
         file_path = current_app.config.get('UPLOAD_FOLDER')
-        file.save(os.path.join(file_path, current_app.config.get('COMMISSION_NAME') + '.xls'))
-        return redirect(url_for('payroll.results'))
+        file.save(os.path.join(file_path, file_name))
+        commission_preprocess(file_path, file_name)
+        return redirect(url_for('payroll.results_1'))
+    flash('Please upload your raw commission file! Then complete the downloaded commission file and upload it in the results tab!')
     return render_template('payroll/index.html', form=form)
 
-@payroll.route('/results')
-def results():
+@payroll.route('/results', methods=['GET', 'POST'])
+def results_1():
+    form = UploadForm()
+    form.file.description = 'Step 3): Please upload modified commission file here.'
+    if form.validate_on_submit():
+        file = request.files['file']
+        file_name = secure_filename(file.filename)
+        file_path = current_app.config.get('UPLOAD_FOLDER')
+        file.save(os.path.join(file_path, file_name))
+        commission_postprocess(file_path, file_name)
+        return redirect(url_for('payroll.results_2'))
+    flash('Please upload your completed commission file!')
+    return render_template('payroll/index.html', form=form)
+
+@payroll.route('/results#')
+def results_2():
     from datetime import datetime
     return render_template('index.html', current_time=datetime.utcnow())
 
@@ -61,7 +82,7 @@ def compute_time(time_list):
     period_2 = 60*int(time_list[3][:2])+int(time_list[3][3:]) - 60*int(time_list[2][:2])-int(time_list[2][3:])
     return round((period_1 + period_2) / 60, 2)
 
-def file_process(path, file_name):
+def timecard_preprocess(path, file_name):
     book = xlrd.open_workbook(os.path.join(path, file_name))
     sh = book.sheet_by_index(0)
 
@@ -109,9 +130,50 @@ def file_process(path, file_name):
         row.write(5, sum(total_hours))
         row.write(6, sum(extra_hours))
         row.write(7, sum(reg_hours))
-    book.save(os.path.join(path, current_app.config.get('ATTENDANCE_NAME')+'.xls'))
+        row = sh.row(index+1)
+        row.write(0, 0) # sick hour
+        row.write(1, 0) # vacation hour
+        row.write(2, 0) # holiday hour
+    book.save(os.path.join(path, current_app.config.get('TIMECARD_NAME')+'.xls'))
 
-    with open(os.path.join(path, current_app.config.get('ATTENDANCE_NAME')+'.json'), 'w') as fp:
+    os.remove(os.path.join(path, file_name))
+
+def timecard_postprocess(path, file_name):
+    book = xlrd.open_workbook(os.path.join(path, file_name))
+
+    records_dict = {}
+    for sheet in book.sheets():
+        person_name = sheet.name
+        total_hour = 0
+        extra_hour = 0
+        reg_hour = 0
+
+        row_num = sheet.nrows
+        for i in range(0, row_num - 2):
+            current_hour = compute_time([sheet.cell(i, 1).value, sheet.cell(i, 2).value, sheet.cell(i, 3).value, sheet.cell(i, 4).value])
+            total_hour += current_hour
+            extra_hour += 0 if current_hour <= 8 else current_hour-8
+            reg_hour += 8 if current_hour > 8 else current_hour
+        additional_hour = float(sheet.cell(row_num-1, 0).value) + float(sheet.cell(row_num-1, 1).value) + float(sheet.cell(row_num-1, 2).value)
+        total_hour += additional_hour
+        reg_hour += additional_hour
+        records_dict[person_name] = [round(total_hour, 2), round(extra_hour, 2), round(reg_hour, 2)]
+
+    with open(os.path.join(path, current_app.config.get('TIMECARD_NAME') + '.json'), 'w') as fp:
         json.dump(records_dict, fp)
 
     os.remove(os.path.join(path, file_name))
+
+def commission_preprocess(path, file_name):
+    book = xlrd.open_workbook(os.path.join(path, file_name))
+    sh = book.sheet_by_index(0)
+
+    records_dict = {}
+    for row_num in range(1, sh.nrows):
+        row = sh.row(row_num)
+        person_id = int(row[0].value)
+        person_name = '-'.join([row[1].value, str(person_id)])
+        final_sale = float(row[2].value)
+
+def commission_postprocess(path, file_name):
+    pass
