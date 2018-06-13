@@ -71,6 +71,10 @@ def results_1():
 
 @payroll.route('/results#')
 def results_2():
+    for file in os.listdir(current_app.config.get('UPLOAD_FOLDER')):
+        if file.endswith(".xls") or file.endswith(".xlsx"):
+            os.remove(os.path.join(current_app.config.get('UPLOAD_FOLDER'), file))
+
     with open(os.path.join(current_app.config.get('UPLOAD_FOLDER'), current_app.config.get('TIMECARD_NAME') + '.json')) as fp:
         timecard_set = json.load(fp)
         with open(os.path.join(current_app.config.get('UPLOAD_FOLDER'), current_app.config.get('COMMISSION_NAME') + '.json')) as fp:
