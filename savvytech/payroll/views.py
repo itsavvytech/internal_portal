@@ -58,7 +58,7 @@ def commission_2():
 @payroll.route('/results', methods=['GET', 'POST'])
 def results_1():
     form = UploadForm()
-    form.file.description = 'Step 3): Please upload completed commission file here.'
+    form.file.description = 'Step 3: Please upload completed commission file here.'
     if form.validate_on_submit():
         file = request.files['file']
         file_name = secure_filename(file.filename)
