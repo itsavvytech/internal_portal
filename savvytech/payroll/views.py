@@ -204,11 +204,13 @@ def commission_preprocess(path, file_name):
     sh = book.sheet_by_index(0)
 
     records_dict = {}
+    final_sale_dict = {}
     for row_num in range(1, sh.nrows):
         row = sh.row(row_num)
         person_id = int(row[0].value)
         person_name = '-'.join([row[1].value.upper(), str(person_id)])
         final_sale = float(row[2].value)
+        final_sale_dict[person_name] = final_sale
 
         bonus, commission = compute_bonus_commission(final_sale, current_app.config.get('SALES_PARAMS')[person_name])
         records_dict[person_name] = [bonus, commission, 0, 0, bonus + commission, round(bonus/2, 2), round(commission/2, 2), round(bonus/2 + commission/2, 2)]
@@ -229,6 +231,22 @@ def commission_preprocess(path, file_name):
         row = sh.row(1)
         for i, record in enumerate(records):
             row.write(i, record)
+
+        row = sh.row(3)
+        row.write(0, 'Revenue')
+        row.write(1, 'Percentage')
+        row.write(2, 'Bonus')
+        bucket_list = current_app.config.get('SALES_PARAMS')[name]
+        index = 4
+        for bucket in bucket_list:
+            row = sh.row(index)
+            for i in range(0, 3):
+                row.write(i, bucket[i])
+            index += 1
+
+        row = sh.row(index+1)
+        row.write(0, 'Final sales')
+        row.write(1, final_sale_dict[name])
     book.save(os.path.join(path, current_app.config.get('COMMISSION_NAME')+'.xls'))
 
 def commission_postprocess(path, file_name):
