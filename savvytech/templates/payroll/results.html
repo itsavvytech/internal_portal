@@ -25,7 +25,7 @@
       {% endfor %}
       {% if people in commission_set %}
         {% for record in commission_set[people] %}
-          <td> {{ record }} </td>
+          <td> {{ ["$", record] | join(" ") }} </td>
         {% endfor %}
       {% else %}
         {% for i in range(4) %}
