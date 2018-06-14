@@ -23,27 +23,13 @@ def index():
         timecard_preprocess(file_path, file_name)
         return send_from_directory(directory=current_app.config.get('UPLOAD_FOLDER'),
                                    filename=current_app.config.get('TIMECARD_NAME') + '.xls', as_attachment=True)
-    flash('Please upload your raw timecard file! Then complete the downloaded timecard and upload it in the commission tab!')
+    flash('Please upload your raw time card!')
     return render_template('payroll/index.html', form=form)
 
-@payroll.route('/commission', methods=['GET', 'POST'])
-def commission_1():
+@payroll.route('/sales', methods=['GET', 'POST'])
+def commission():
     form = UploadForm()
-    form.file.description = 'Step 2 a): Please upload completed timecard here.'
-    if form.validate_on_submit():
-        file = request.files['file']
-        file_name = secure_filename(file.filename)
-        file_path = current_app.config.get('UPLOAD_FOLDER')
-        file.save(os.path.join(file_path, file_name))
-        timecard_postprocess(file_path, file_name)
-        return redirect(url_for('payroll.commission_2'))
-    flash('Please upload your completed timecard file!')
-    return render_template('payroll/index.html', form=form)
-
-@payroll.route('/commission#', methods=['GET', 'POST'])
-def commission_2():
-    form = UploadForm()
-    form.file.description = 'Step 2 b): Please upload raw commission file here.'
+    form.file.description = 'Step 2: Please upload raw sales report here.'
     if form.validate_on_submit():
         file = request.files['file']
         file_name = secure_filename(file.filename)
@@ -52,25 +38,39 @@ def commission_2():
         commission_preprocess(file_path, file_name)
         return send_from_directory(directory=current_app.config.get('UPLOAD_FOLDER'),
                                    filename=current_app.config.get('COMMISSION_NAME') + '.xls', as_attachment=True)
-    flash('Please upload your raw commission file! Then complete the downloaded commission file and upload it in the results tab!')
+    flash('Please upload your raw sales report!')
     return render_template('payroll/index.html', form=form)
 
 @payroll.route('/results', methods=['GET', 'POST'])
 def results_1():
     form = UploadForm()
-    form.file.description = 'Step 3: Please upload completed commission file here.'
+    form.file.description = 'Step 3 a): Please upload completed time card here.'
+    if form.validate_on_submit():
+        file = request.files['file']
+        file_name = secure_filename(file.filename)
+        file_path = current_app.config.get('UPLOAD_FOLDER')
+        file.save(os.path.join(file_path, file_name))
+        timecard_postprocess(file_path, file_name)
+        return redirect(url_for('payroll.results_2'))
+    flash('Please upload your completed time card!')
+    return render_template('payroll/index.html', form=form)
+
+@payroll.route('/results#', methods=['GET', 'POST'])
+def results_2():
+    form = UploadForm()
+    form.file.description = 'Step 3 b): Please upload completed commission file here.'
     if form.validate_on_submit():
         file = request.files['file']
         file_name = secure_filename(file.filename)
         file_path = current_app.config.get('UPLOAD_FOLDER')
         file.save(os.path.join(file_path, file_name))
         commission_postprocess(file_path, file_name)
-        return redirect(url_for('payroll.results_2'))
+        return redirect(url_for('payroll.results_3'))
     flash('Please upload your completed commission file!')
     return render_template('payroll/index.html', form=form)
 
-@payroll.route('/results#')
-def results_2():
+@payroll.route('/results##')
+def results_3():
     for file in os.listdir(current_app.config.get('UPLOAD_FOLDER')):
         if file.endswith(".xls") or file.endswith(".xlsx"):
             os.remove(os.path.join(current_app.config.get('UPLOAD_FOLDER'), file))
@@ -241,12 +241,15 @@ def commission_preprocess(path, file_name):
         for bucket in bucket_list:
             row = sh.row(index)
             for i in range(0, 3):
-                row.write(i, bucket[i])
+                if i == 1:
+                    row.write(i, str(round(float(bucket[i])*100, 2))+'%')
+                else:
+                    row.write(i, '$ '+ str(bucket[i]))
             index += 1
 
         row = sh.row(index+1)
         row.write(0, 'Final sales')
-        row.write(1, final_sale_dict[name])
+        row.write(1, '$ ' + str(final_sale_dict[name]))
     book.save(os.path.join(path, current_app.config.get('COMMISSION_NAME')+'.xls'))
 
 def commission_postprocess(path, file_name):
